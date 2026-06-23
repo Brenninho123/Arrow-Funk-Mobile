@@ -1,41 +1,48 @@
-# This is a basic workflow to help you get started with Actions
+name: Build Android
 
-name: Build
-
-# Controls when the action will run. 
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  buildWindows:
-    runs-on: windows-latest
-    
+  buildAndroid:
+    runs-on: ubuntu-latest
+
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@main
 
       - uses: krdlab/setup-haxe@master
         with:
           haxe-version: 4.2.0
-      # Runs a set of commands using the runners shell
+
+      - uses: actions/setup-java@main
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - uses: android-actions/setup-android@main
+
+      - uses: nttld/setup-ndk@main
+        id: setup-ndk
+        with:
+          ndk-version: r25c
+
       - name: Install Haxelib
         run: |
-          haxelib setup C:/haxelib
-          haxelib install hxcpp > nul
+          haxelib setup ~/haxelib
+          haxelib install hxcpp > /dev/null
           haxelib install lime
           haxelib install openfl
           haxelib --never install flixel
           haxelib run lime setup flixel
           haxelib run lime setup
+          haxelib run lime config ANDROID_SDK $ANDROID_SDK_ROOT
+          haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }}
+          haxelib run lime config JAVA_HOME $JAVA_HOME
+          haxelib run lime config ANDROID_SETUP true
           haxelib install flixel-tools
           haxelib install flixel-ui
           haxelib install flixel-addons
@@ -47,13 +54,15 @@ jobs:
           haxelib git discord_rpc https://github.com/Aidan63/linc_discord-rpc
           haxelib install hxcpp-debug-server
           haxelib list
-        shell: cmd
+
       - name: Create Version Tag
-        run: echo "${{github.run_id}}" > VERSION
+        run: echo "${{ github.run_id }}" > VERSION
+
       - name: Compile
-        run: haxelib run lime build windows --app-version="4.0.0-${{ github.run_id}}"
+        run: haxelib run lime build android -release --app-version="4.0.0-${{ github.run_id }}"
+
       - name: Publish Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@main
         with:
-          name: windowsBuild
-          path: export/release/windows/bin
+          name: androidBuild
+          path: export/release/android/bin
